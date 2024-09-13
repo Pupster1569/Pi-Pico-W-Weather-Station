@@ -51,4 +51,4 @@ The pins used for the system are:
 
 Power is supplied to the modules via the Pico's 3.3V pin and ground is supplied by any of the Pico's ground pins
 
-You are free to use these files as you wish. I do however ask that if you re-upload it you credit it me
+You are free to use these files as you wish. I do however ask that if you decide to re-upload it, please credit it me :)
