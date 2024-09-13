@@ -111,7 +111,7 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
 
                 def main():
                     # set globals
-                    global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config
+                    global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config, debug
                     global UPDATE_INTERVAL, LOG_INTERVAL, THRESHOLD, MAX_TIME_DIFF, TIMEOUT
                     # rpm_values = []
                     try:
@@ -198,17 +198,18 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                                 if rpm_count > 0: avg_rpm = rpm_total/rpm_count
                                 else: avg_rpm = 0
 
-                                if debug: print(txt_data)
                                 time = rtc.get_time() # get current date and time
 
+                                txt_data = f'{highest_rpm:.2f}, {avg_rpm:.2f}, {rotations}, {temp}, {hum}'
                                 if config["Other"]["File Type"] == "txt":
-                                    txt_data = f'{highest_rpm:.2f}, {avg_rpm:.2f}, {rotations}, {temp}, {hum}'
                                     txt_time = f'{time[0]}/{time[1]}/{time[2]}, {time[3]}:{time[4]}:{time[5]}'
                                     SDsave.data(txt_data, txt_time) # save data to txt
                                 elif config["Other"]["File Type"] == "csv":
-                                    csv_time = f'{time[0]}/{time[1]}/{time[2]};{time[3]}:{time[4]}:{time[5]}'
+                                    csv_time = f'{time[0]}/{time[1]}/{time[2]} ;{time[3]}:{time[4]}:{time[5]}'
                                     csv_data = f'{highest_rpm:.2f};{avg_rpm:.2f};{rotations};{temp};{hum}'
                                     SDsave.data(csv_data, csv_time) # save data to csv
+
+                                if debug: print(txt_data)
 
                                 # reset values for next 10 minutes
                                 rotations, rpm_count, rpm_total, highest_rpm = 0, 0, 0, 0
