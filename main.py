@@ -1,4 +1,5 @@
-import machine, utime, ssd1306, _thread, configparser, ds3231, temperature, SDsave, server # import required libraries
+if __name__ == "__main__": import temperature, SDsave, server
+import machine, utime, ssd1306, _thread, configparser, ds3231, gc # import required libraries
 last_log_time = utime.ticks_ms() # setup initial log output time so log time doesn't start at 2
 
 """
@@ -58,182 +59,202 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                 oled.show()
                 settings_error = True
             if not settings_error: # code doesn't run there is no 'settings.ini' file found
-                config = configparser.ConfigParser()
-                config.read("settings.ini")
+                try:
+                    config = configparser.ConfigParser()
+                    config.read("settings.ini")
 
-                debug = bool(config["Other"]["Debug"])
+                    debug = bool(config["Other"]["Debug"])
 
-                # check if the webserver needs to be activated
-                server_toggle = machine.Pin(21,machine.Pin.OUT).value()
-                oled.text("Web Server: ", 0, 0)
-                if server_toggle: oled.text("ACTIVE", 0, 10)
-                else: oled.text("INACTIVE", 0, 10)
-                oled.show()
-                if not debug: utime.sleep(0.5)
-                if server_toggle: addr,s,clients = server.initialise() # initialise the webserver if toggled
+                    def getTime() -> tuple: # type: ignore
+                        try: return rtc.get_time()
+                        except Exception as e:
+                            if debug: print(e, "Couldnt get the time")
+                            SDsave.error(e, "Couldnt get the time")
+                            oled.fill(0)
+                            oled.text("ERR: 4", 0, 0)
+                            oled.show()
+                            return (0,0,0,0,0,0,0,0)
 
-                anemometer = machine.ADC(machine.Pin(28)) # Configure the anemometer on GP28
+                    # check if the webserver needs to be activated
+                    server_toggle = machine.Pin(21,machine.Pin.OUT).value()
+                    oled.text("Web Server: ", 0, 0)
+                    if server_toggle: oled.text("ACTIVE", 0, 10)
+                    else: oled.text("INACTIVE", 0, 10)
+                    oled.show()
+                    if not debug: utime.sleep(0.5)
+                    if server_toggle: addr,s,clients = server.initialise() # initialise the webserver if toggled
 
-                # Constants
-                THRESHOLD = int(config["RPM"]["Threshold"])  # Threshold to distinguish between high and low values
-                MAX_TIME_DIFF = int(config["RPM"]["Max Time Diff"])  # Maximum time difference (in milliseconds) to consider valid
-                TIMEOUT = int(config["RPM"]["Timeout"])  # Timeout in milliseconds to reset RPM to 0 if no movement
-                UPDATE_INTERVAL = int(config["RPM"]["Update Interval"]) # Interval between updating the display in milliseconds
-                LOG_INTERVAL = int(config["RPM"]["Log Interval"]) # Interval in ms between each log output, 600000 ms = 10 min or 600 seconds
+                    anemometer = machine.ADC(machine.Pin(28)) # Configure the anemometer on GP28
 
-                # Variables for edge detection and timing
-                last_output_time = utime.ticks_ms()
-                last_value, last_edge_time, edge_times = 0, 0, []
-                rpm, rpm_count, rpm_total, highest_rpm, avg_rpm, rotations = 0, 0, 0, 0, 0, 0
+                    # Constants
+                    THRESHOLD = int(config["RPM"]["Threshold"])  # Threshold to distinguish between high and low values
+                    MAX_TIME_DIFF = int(config["RPM"]["Max Time Diff"])  # Maximum time difference (in milliseconds) to consider valid
+                    TIMEOUT = int(config["RPM"]["Timeout"])  # Timeout in milliseconds to reset RPM to 0 if no movement
+                    UPDATE_INTERVAL = int(config["RPM"]["Update Interval"]) # Interval between updating the display in milliseconds
+                    LOG_INTERVAL = int(config["RPM"]["Log Interval"]) # Interval in ms between each log output, 600000 ms = 10 min or 600 seconds
 
-                def calculate_rpm() -> float|Exception:
-                    """
-                    Calculates current rpm using the time taken between each edge
-                    """
-                    try:
-                        global edge_times, rpm
-                        if len(edge_times) < 4:
-                            return 0
-                        
-                        total_time = sum(edge_times[-4:])
-                        if total_time > 0:
-                            rpm = 60000 / total_time  # One rotation per 4 edges, 60000 milliseconds in a minute
-                        return rpm
-                    except Exception as e: return e
+                    # Variables for edge detection and timing
+                    last_output_time = utime.ticks_ms()
+                    last_value, last_edge_time, edge_times = 0, 0, []
+                    rpm, rpm_count, rpm_total, highest_rpm, avg_rpm, rotations = 0, 0, 0, 0, 0, 0
 
-                temp,hum = 0,0
-                def temperatureCore():
-                    """
-                    Calculates temperature and humidity on the second core as to not interfere with first cores calculations
-                    """
-                    global temp, hum
-                    temp, hum = temperature.read()
-
-                def main():
-                    # set globals
-                    global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config, debug
-                    global UPDATE_INTERVAL, LOG_INTERVAL, THRESHOLD, MAX_TIME_DIFF, TIMEOUT
-                    # rpm_values = []
-                    try:
-                        time = rtc.get_time()
-                        while True:
-                            if server_toggle: server.server(addr,s,clients) # run webserver code if toggled
-
-                            current_value = anemometer.read_u16() # get anemometer analogue value
-                            current_time = utime.ticks_ms()  # get current time in milliseconds
+                    def calculate_rpm() -> float|Exception:
+                        """
+                        Calculates current rpm using the time taken between each edge
+                        """
+                        try:
+                            global edge_times, rpm
+                            if len(edge_times) < 4:
+                                return 0
                             
-                            if (current_value < THRESHOLD and last_value >= THRESHOLD) or \
-                            (current_value >= THRESHOLD and last_value < THRESHOLD):
-                                # edge detected
-                                edge_time = utime.ticks_diff(current_time, last_edge_time)
-                                rotations += 0.25
+                            total_time = sum(edge_times[-4:])
+                            if total_time > 0:
+                                rpm = 60000 / total_time  # One rotation per 4 edges, 60000 milliseconds in a minute
+                            return rpm
+                        except Exception as e:
+                            time = getTime()
+                            SDsave.error(e, "Error while calculating rpm", f'{time[3]}:{time[4]}:{time[5]}')
+                            return e
+
+                    temp,hum = 0,0
+                    def temperatureCore():
+                        """
+                        Calculates temperature and humidity on the second core as to not interfere with first cores calculations
+                        """
+                        global temp, hum
+                        temp, hum = temperature.read()
+
+                    def main():
+                        # set globals
+                        global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config, debug
+                        global UPDATE_INTERVAL, LOG_INTERVAL, THRESHOLD, MAX_TIME_DIFF, TIMEOUT
+                        # rpm_values = []
+                        try:
+                            time = getTime()
+                            while True:
+                                if server_toggle: server.server(addr,s,clients) # run webserver code if toggled
+
+                                current_value = anemometer.read_u16() # get anemometer analogue value
+                                current_time = utime.ticks_ms()  # get current time in milliseconds
                                 
-                                if edge_time < MAX_TIME_DIFF:
-                                    edge_times.append(edge_time)
-                                    if len(edge_times) > 4:
-                                        edge_times.pop(0)
+                                if (current_value < THRESHOLD and last_value >= THRESHOLD) or \
+                                (current_value >= THRESHOLD and last_value < THRESHOLD):
+                                    # edge detected
+                                    edge_time = utime.ticks_diff(current_time, last_edge_time)
+                                    rotations += 0.25
                                     
-                                    rpm = calculate_rpm()
-                                    if type(rpm) == Exception:
-                                        if debug: print(f"{rpm}, Error calculating rpm")
-                                        time = rtc.get_time()
-                                        SDsave.error(Exception(rpm), "Error calculating rpm", f"{time[3]}:{time[4]}:{time[5]}")
+                                    if edge_time < MAX_TIME_DIFF:
+                                        edge_times.append(edge_time)
+                                        if len(edge_times) > 4:
+                                            edge_times.pop(0)
+                                        
+                                        rpm = calculate_rpm()
+                                        if type(rpm) == Exception:
+                                            if debug: print(f"{rpm}, Error calculating rpm")
+                                            time = getTime()
+                                            oled.fill(0)
+                                            oled.text("ERR: 2", 0, 0)
+                                            oled.show()
+                                            utime.sleep(1)
+                                            break
+                                    last_edge_time = current_time  # update last_edge_time for every edge detection
+
+                                # check for timeout
+                                if utime.ticks_diff(current_time, last_edge_time) > TIMEOUT:
+                                    rpm = 0
+                                    edge_times = []
+
+                                if utime.ticks_diff(current_time, last_output_time) >= UPDATE_INTERVAL:
+                                    _thread.start_new_thread(temperatureCore,())
+                                    if temp == None:
+                                        if debug: print(f"{hum}, Error on temperature core")
+                                        time = getTime()
+                                        SDsave.error(Exception(hum), "Error on temperature core", f"{time[3]}:{time[4]}:{time[5]}")
                                         oled.fill(0)
-                                        oled.text("ERR: 2", 0, 0)
+                                        oled.text("ERR: 0", 0, 0)
                                         oled.show()
                                         utime.sleep(1)
                                         break
-                                last_edge_time = current_time  # update last_edge_time for every edge detection
+                                    
+                                    # alternate average method incase timeout is set above 4 seconds to stop average from being affected too heavily
+                                    # if len(rpm_values) >= (TIMEOUT/1000): rpm_values = []
+                                    # rpm_values.append(rpm)
+                                    # if len(rpm_values) - 2 >= 0 and rpm_values[-3] != rpm and rpm != 0:
+                                    #     rpm_count += 1
+                                    #     rpm_total += rpm
+                                    # else:
+                                    #     rpm_count += 1
+                                    #     rpm_total += rpm
+                                    
+                                    # set highest rpm
+                                    if rpm > highest_rpm: highest_rpm = rpm  # type: ignore
+                                    # add rpm values for average
+                                    if rpm != 0:
+                                        rpm_count += 1
+                                        rpm_total += rpm # type: ignore
 
-                            # check for timeout
-                            if utime.ticks_diff(current_time, last_edge_time) > TIMEOUT:
-                                rpm = 0
-                                edge_times = []
+                                    if debug: time = getTime()
+                                    if debug: print(f"Current RPM: {rpm:.2f}, Temperature: {temp}°C, Humidity: {hum}%, Time: {time[3]}:{time[4]}:{time[5]}")
+                                    # output values to the display
+                                    oled.fill(0) # clear the display
+                                    oled.text(f"RPM: {rpm:.2f}", 0, 0)
+                                    oled.text(f"Temp: {temp}C", 0, 10)
+                                    oled.text(f"Hum: {hum}%", 0, 20)
+                                    # oled.text(f"{time[3]}:{time[4]}:{time[5]}", 0, 20)
+                                    oled.show()
+                                    # reset output time so this code runs the next second
+                                    last_output_time = current_time
 
-                            if utime.ticks_diff(current_time, last_output_time) >= UPDATE_INTERVAL:
-                                _thread.start_new_thread(temperatureCore,())
-                                if temp == None:
-                                    if debug: print(f"{hum}, Error on temperature core")
-                                    time = rtc.get_time()
-                                    SDsave.error(Exception(hum), "Error on temperature core", f"{time[3]}:{time[4]}:{time[5]}")
-                                    # oled.fill(0)
-                                    # oled.text("ERR: 0", 0, 0)
-                                    # oled.show()
-                                    # utime.sleep(1)
-                                    # break
-                                
-                                # alternate average method incase timeout is set above 4 seconds to stop average from being affected too heavily
-                                # if len(rpm_values) >= (TIMEOUT/1000): rpm_values = []
-                                # rpm_values.append(rpm)
-                                # if len(rpm_values) - 2 >= 0 and rpm_values[-3] != rpm and rpm != 0:
-                                #     rpm_count += 1
-                                #     rpm_total += rpm
-                                # else:
-                                #     rpm_count += 1
-                                #     rpm_total += rpm
-                                
-                                # set highest rpm
-                                if rpm > highest_rpm: highest_rpm = rpm  # type: ignore
-                                # add rpm values for average
-                                if rpm != 0:
-                                    rpm_count += 1
-                                    rpm_total += rpm # type: ignore
+                                if utime.ticks_diff(current_time, last_log_time) >= LOG_INTERVAL:
+                                    # save data to microSD card every 10 minutes
 
-                                if debug: time = rtc.get_time()
-                                if debug: print(f"Current RPM: {rpm:.2f}, Temperature: {temp}°C, Humidity: {hum}%, Time: {time[3]}:{time[4]}:{time[5]}")
-                                # output values to the display
-                                oled.fill(0) # clear the display
-                                oled.text(f"RPM: {rpm:.2f}", 0, 0)
-                                oled.text(f"Temp: {temp}C", 0, 10)
-                                oled.text(f"Hum: {hum}%", 0, 20)
-                                # oled.text(f"{time[3]}:{time[4]}:{time[5]}", 0, 20)
-                                oled.show()
-                                # reset output time so this code runs the next second
-                                last_output_time = current_time
+                                    # calculate average rpm
+                                    if rpm_count > 0: avg_rpm = rpm_total/rpm_count
+                                    else: avg_rpm = 0
 
-                            if utime.ticks_diff(current_time, last_log_time) >= LOG_INTERVAL:
-                                # save data to microSD card every 10 minutes
+                                    time = getTime() # get current date and time
 
-                                # calculate average rpm
-                                if rpm_count > 0: avg_rpm = rpm_total/rpm_count
-                                else: avg_rpm = 0
+                                    txt_data = f'{highest_rpm:.2f}, {avg_rpm:.2f}, {rotations}, {temp}, {hum}'
+                                    if config["Other"]["File Type"] == "txt":
+                                        txt_time = f'{time[0]}/{time[1]}/{time[2]}, {time[3]}:{time[4]}:{time[5]}'
+                                        SDsave.data(txt_data, txt_time) # save data to txt
+                                    elif config["Other"]["File Type"] == "csv":
+                                        csv_time = f'{time[0]}/{time[1]}/{time[2]} ;{time[3]}:{time[4]}:{time[5]}'
+                                        csv_data = f'{highest_rpm:.2f};{avg_rpm:.2f};{rotations};{temp};{hum}'
+                                        SDsave.data(csv_data, csv_time) # save data to csv
 
-                                time = rtc.get_time() # get current date and time
+                                    if debug: print(txt_data)
 
-                                txt_data = f'{highest_rpm:.2f}, {avg_rpm:.2f}, {rotations}, {temp}, {hum}'
-                                if config["Other"]["File Type"] == "txt":
-                                    txt_time = f'{time[0]}/{time[1]}/{time[2]}, {time[3]}:{time[4]}:{time[5]}'
-                                    SDsave.data(txt_data, txt_time) # save data to txt
-                                elif config["Other"]["File Type"] == "csv":
-                                    csv_time = f'{time[0]}/{time[1]}/{time[2]} ;{time[3]}:{time[4]}:{time[5]}'
-                                    csv_data = f'{highest_rpm:.2f};{avg_rpm:.2f};{rotations};{temp};{hum}'
-                                    SDsave.data(csv_data, csv_time) # save data to csv
+                                    # reset values for next 10 minutes
+                                    rotations, rpm_count, rpm_total, highest_rpm = 0, 0, 0, 0
+                                    last_log_time = current_time
+                                    try: gc.collect()
+                                    except Exception as e:
+                                        if debug: print(e, "Error while collecting garbage")
+                                        SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
 
-                                if debug: print(txt_data)
+                                last_value = current_value
+                                utime.sleep(0.005) # small delay so sensors can update correctly
+                        except Exception as e:
+                            # check for errors in the main loop
+                            if debug: print(f'{e}, "Error in main loop"')
+                            time = getTime()
+                            SDsave.error(e, "Error in main loop", f"{time[3]}:{time[4]}:{time[5]}")
+                            oled.fill(0)
+                            oled.text("ERR", 0, 0)
+                            oled.show()
 
-                                # reset values for next 10 minutes
-                                rotations, rpm_count, rpm_total, highest_rpm = 0, 0, 0, 0
-                                last_log_time = current_time
-
-                            last_value = current_value
-                            utime.sleep(0.005) # small delay so sensors can update correctly
+                    # start script
+                    try:
+                        if __name__ == "__main__": main()
                     except Exception as e:
                         # check for errors in the main loop
                         if debug: print(f'{e}, "Error in main loop"')
-                        time = rtc.get_time()
+                        time = getTime()
                         SDsave.error(e, "Error in main loop", f"{time[3]}:{time[4]}:{time[5]}")
                         oled.fill(0)
                         oled.text("ERR", 0, 0)
                         oled.show()
-
-                # start script
-                try:
-                    if __name__ == "__main__": main()
                 except Exception as e:
-                    # check for errors in the main loop
-                    if debug: print(f'{e}, "Error in main loop"')
-                    time = rtc.get_time()
-                    SDsave.error(e, "Error in main loop", f"{time[3]}:{time[4]}:{time[5]}")
-                    oled.fill(0)
-                    oled.text("ERR", 0, 0)
-                    oled.show()
+                    if debug: print(e, "Error :[)")
+                    SDsave.error(e, "Error :[)")

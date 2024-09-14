@@ -1,7 +1,11 @@
-import machine, sdcard, os, utime, configparser
+import machine, sdcard, os, utime, configparser, ssd1306
 
 spi = machine.SPI(0, sck=machine.Pin(18), mosi=machine.Pin(19), miso=machine.Pin(16))
 cs = machine.Pin(17, machine.Pin.OUT)
+
+i2c = machine.I2C(1, scl=machine.Pin(27), sda=machine.Pin(26))
+oled = ssd1306.SSD1306_I2C(128, 32, i2c)
+oled.fill(0) # clear the display
 
 def make_readable(seconds): 
     """
@@ -53,22 +57,40 @@ def data(data:str, time: str):
     """
     Saves readings to the 'data.txt' or the 'data.csv' file
     """
-    config = configparser.ConfigParser()
-    config.read("settings.ini")
+    try:
+        config = configparser.ConfigParser()
+        config.read("settings.ini")
 
-    if config["Other"]["File Type"] == "csv": 
-        with open("data.csv", "a") as file: file.write(f"{time};{data}\n")
-    elif config["Other"]["File Type"] == "txt":
-        with open("data.txt", "a") as file: file.write(f"{time}, {data}\n")
+        if config["Other"]["File Type"] == "csv": 
+            with open("data.csv", "a") as file: file.write(f"{time};{data}\n")
+        elif config["Other"]["File Type"] == "txt":
+            with open("data.txt", "a") as file: file.write(f"{time}, {data}\n")
+    except Exception as e:
+        oled.fill(0)
+        oled.text("ERR: 1", 0, 0)
+        oled.show()
+        raise e
 
-def error(error:Exception, desc:str, time: str):
+def error(error:Exception, desc:str, time:str='N/A'):
     """
     Saves errors to the 'error log.txt' file
     """
-    with open("error.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {str(error)}, {desc}\n")
+    try:
+        with open("error.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {str(error)}, {desc}\n")
+    except Exception as e:
+        oled.fill(0)
+        oled.text("ERR: 1", 0, 0)
+        oled.show()
+        raise e
 
-def debug(data:str, time: str):
+def debug(data:str, time:str):
     """
     Saves debug statements to the 'debug log.txt' file
     """
-    with open("debug.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {data}\n")
+    try:
+        with open("debug.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {data}\n")
+    except Exception as e:
+        oled.fill(0)
+        oled.text("ERR: 1", 0, 0)
+        oled.show()
+        raise e
