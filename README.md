@@ -1,4 +1,5 @@
 # Raspberry Pi Pico W Weather Station
+---
 
 This is a simple weather station developed for the raspberry Pi Pico W micro controller. This project was made for a commission. 
 
@@ -48,7 +49,41 @@ The pins used for the system are:
   * scl: 27
 * #### ANEMOMETER PINS
   * data: 28
-
 Power is supplied to the modules via the Pico's 3.3V pin and ground is supplied by any of the Pico's ground pins
 
-You are free to use these files as you wish. I do however ask that if you decide to re-upload it, please credit it me :)
+---
+# Settings.ini Documentation
+[setting] - input type
+
+#### Wi-Fi Settings
+* Wi-Fi SSID - string
+  * Name of the network the pico will connect to when the server is toggled
+* Wi-Fi Pass - string
+  * Password for aforementioned network name
+
+#### NTP Settings
+* Time Zone Offset - integer
+  * Sets your current time zone, for example my time zone is GMT+2 therefore my offset will be 2
+* NTP Server - string
+  * Sets the server to get the current network protocol time (ntp). This should'nt need to be changed as [pool.ntp.org](pool.ntp.org) is the standard
+
+#### RPM
+* Threshold - integer
+  * Changes the threshold for the edge detection
+* Max Time Diff - integer
+  * Sets the maximum allowed time between each edge, the higher the value the lower the rpm that the system can detect. Not to be confused with Timeout
+* Timeout - integer
+  * Sets the time that it takes with no edge updates before the rpm gets set to 0
+* Update Interval - integer
+  * Sets the delay between each display update
+* Log Interval - integer
+  * Sets the delay between each log to the data file
+
+#### Other
+* Debug - boolean
+  * Toggles extra info for debugging (recommended set to false)
+* File Type - string
+  * Sets the file type of the data log output. Supported file types are: txt, csv
+
+---
+⚠️You are free to use these files as you wish. I do however ask that if you decide to re-upload it, please credit it me :)⚠️
