@@ -97,6 +97,7 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                     last_output_time = utime.ticks_ms()
                     last_value, last_edge_time, edge_times = 0, 0, []
                     rpm, rpm_count, rpm_total, highest_rpm, avg_rpm, rotations = 0, 0, 0, 0, 0, 0
+                    collect_garbage = False
 
                     def calculate_rpm() -> float|Exception:
                         """
@@ -121,21 +122,27 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                         """
                         Calculates temperature and humidity on the second core as to not interfere with first cores calculations
                         """
-                        global temp, hum
+                        global temp, hum, collect_garbage
                         temp, hum = temperature.read()
+                        if collect_garbage:
+                            try: gc.collect()
+                            except Exception as e:
+                                if debug: print(e, "Error while collecting garbage")
+                                SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
+                            collect_garbage = False
                     
-                    def garbageCore():
-                        """
-                        Collects garbage in a separate thread
-                        """
-                        try: gc.collect()
-                        except Exception as e:
-                            if debug: print(e, "Error while collecting garbage")
-                            SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
+                    # def garbageCore():
+                    #     """
+                    #     Collects garbage in a separate thread
+                    #     """
+                    #     try: gc.collect()
+                    #     except Exception as e:
+                    #         if debug: print(e, "Error while collecting garbage")
+                    #         SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
 
                     def main():
                         # set globals
-                        global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config, debug
+                        global last_value, last_edge_time, edge_times, rpm, last_output_time, last_log_time, rpm_count, rpm_total, highest_rpm, rotations, addr, s, clients, rtc, config, debug, collect_garbage
                         global UPDATE_INTERVAL, LOG_INTERVAL, THRESHOLD, MAX_TIME_DIFF, TIMEOUT
                         # rpm_values = []
                         try:
@@ -242,7 +249,8 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                                     #     if debug: print(e, "Error while collecting garbage")
                                     #     SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
                                     
-                                    _thread.start_new_thread(temperatureCore,())
+                                    # _thread.start_new_thread(garbageCore,())
+                                    collect_garbage = True
 
                                 last_value = current_value
                                 utime.sleep(0.005) # small delay so sensors can update correctly

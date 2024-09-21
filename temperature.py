@@ -7,7 +7,7 @@ def read() -> list[int]|list:
     try:
         # Trigger a measurement
         dht_sensor.measure()
-        return [round(dht_sensor.temperature(),2), round(dht_sensor.humidity(),2)]
+        return [round(dht_sensor.temperature(),1), round(dht_sensor.humidity(),1)]
     except Exception as e:
         SDsave.error(e, "Error reading temperature and humidity")
         return [None,e]
