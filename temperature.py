@@ -1,5 +1,5 @@
 import machine, dht, SDsave
-dht_sensor = dht.DHT11(machine.Pin(22)) # define temperature & humidity sensor
+dht_sensor = dht.DHT22(machine.Pin(22)) # define temperature & humidity sensor
 def read() -> list[int]|list:
     """
     Returns the current temperature and humidity as [Temp,Hum]. Returns [None, e] if an error occurred
