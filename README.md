@@ -5,7 +5,7 @@ This is a simple weather station developed for the raspberry Pi Pico W micro con
 
 The system uses a ssd1306 oled display, a standard micro sd card module, a dht22 (a dht11 also works, just be sure to adjust temperature.py) temperature and humidity sensor, a 3 cup anemometer, a simple switch, and a ds3231 rtc module
 
-Data is saved onto a microSD card (<=16GB) by default every 10 minutes (configurable in settings.ini) as either a .txt file or a .csv file (configurable in settings.ini). Errors are logged to an error.log file, and debug info (if enabled) saves to a debug.log file
+Data is saved onto a microSD card (<=16GB) by default every 10 minutes (configurable in settings.ini) as either a .txt file or a .csv file (configurable in settings.ini). Errors are logged to an error.log file, and debug info (if enabled) saves to a debug.log file. While saving the onboard led will light up, however from testing prior to adding this feature, I doubt the led will ever actually turn on due to how fast the system accesses the microSD card. In the case that it is on, **DO NOT** remove the microSD card or remove power from the system as this can cause the microSD card to corrupt
 
 The system uses the onboard Wi-Fi module to host a webserver on a network specified in the settings.ini file. The webserver is very simple, 
 consisting only of a button to download the data file (nothing more was required for the commission). The webserver can be toggled on the fly using the switch. Please note that the system must be turned off before enabling or disabling the webserver as the switch does nothing during runtime. This is because Wi-Fi modules can be finnicky, so to stop any Wi-Fi weirdness the system must be off before toggling the webserver
