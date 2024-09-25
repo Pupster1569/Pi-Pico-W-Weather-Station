@@ -7,6 +7,8 @@ i2c = machine.I2C(1, scl=machine.Pin(27), sda=machine.Pin(26))
 oled = ssd1306.SSD1306_I2C(128, 32, i2c)
 oled.fill(0) # clear the display
 
+led = machine.Pin("LED", machine.Pin.OUT) # set up the onboard LED for a saving indicator
+
 def make_readable(seconds): 
     """
     Format seconds into 00:00:00
@@ -18,6 +20,7 @@ def initialise():
     Set up the microSD card
     """
     try:
+        led.on()
         sd = sdcard.SDCard(spi, cs)
 
         vfs = os.VfsFat(sd) # type: ignore
@@ -42,6 +45,7 @@ def initialise():
         # debug
         try: open("debug.log", "r").close()
         except: open("debug.log","w").close()
+        led.off()
     except Exception as e:
         return [None, e]
 
@@ -60,11 +64,12 @@ def data(data:str, time: str):
     try:
         config = configparser.ConfigParser()
         config.read("settings.ini")
-
+        led.on()
         if config["Other"]["File Type"] == "csv": 
             with open("data.csv", "a") as file: file.write(f"{time};{data}\n")
         elif config["Other"]["File Type"] == "txt":
             with open("data.txt", "a") as file: file.write(f"{time}, {data}\n")
+        led.off()
     except Exception as e:
         oled.fill(0)
         oled.text("ERR: 1", 0, 0)
@@ -76,7 +81,9 @@ def error(error:Exception, desc:str, time:str='N/A'):
     Saves errors to the 'error log.txt' file
     """
     try:
+        led.on()
         with open("error.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {str(error)}, {desc}\n")
+        led.off()
     except Exception as e:
         oled.fill(0)
         oled.text("ERR: 1", 0, 0)
@@ -88,7 +95,9 @@ def debug(data:str, time:str):
     Saves debug statements to the 'debug log.txt' file
     """
     try:
+        led.on()
         with open("debug.log", "a") as file: file.write(f"Elapsed: [{make_readable(round(utime.ticks_ms()/1000))}], Time: {time}, {data}\n")
+        led.off()
     except Exception as e:
         oled.fill(0)
         oled.text("ERR: 1", 0, 0)
