@@ -130,15 +130,6 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                                 if debug: print(e, "Error while collecting garbage")
                                 SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
                             collect_garbage = False
-                    
-                    # def garbageCore():
-                    #     """
-                    #     Collects garbage in a separate thread
-                    #     """
-                    #     try: gc.collect()
-                    #     except Exception as e:
-                    #         if debug: print(e, "Error while collecting garbage")
-                    #         SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
 
                     def main():
                         # set globals
@@ -244,12 +235,6 @@ if not rtc_error: # code doesn't run if an error is found with rtc module
                                     # reset values for next 10 minutes
                                     rotations, rpm_count, rpm_total, highest_rpm = 0, 0, 0, 0
                                     last_log_time = current_time
-                                    # try: gc.collect()
-                                    # except Exception as e:
-                                    #     if debug: print(e, "Error while collecting garbage")
-                                    #     SDsave.error(e, "Error while collecting garbage", f"{time[3]}:{time[4]}:{time[5]}")
-                                    
-                                    # _thread.start_new_thread(garbageCore,())
                                     collect_garbage = True
 
                                 last_value = current_value
